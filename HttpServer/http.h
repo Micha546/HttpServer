@@ -9,6 +9,10 @@
 
 class Http {
 public:
+	static constexpr char CR = '\r';
+	static constexpr char LF = '\n';
+	static constexpr const char* CRLF = "\r\n";
+
 	bool is_bad() { return m_bad_http; }
 	const std::map<std::string, std::string>& get_headers() const { return m_headers; }
 	std::map<std::string, std::string>& get_headers() { return m_headers; }
@@ -39,10 +43,6 @@ protected:
 	std::string headers_to_string() const;
 	std::string data_to_string() const;
 	std::string version_to_string() const;
-
-	static constexpr char CR = '\r';
-	static constexpr char LF = '\n';
-	static constexpr const char* CRLF = "\r\n";
 
 private:
 	bool parse_line(std::string& line);
