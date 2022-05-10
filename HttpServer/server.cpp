@@ -36,13 +36,14 @@ void Server::listen_forever(int port) {
 
 Server::SocketStatus::SocketStatus()
 	: _socket(INVALID_SOCKET), _socket_info({}), _recv_status(SocketStatus::ReceiveStatus::EMPTY), _send_status(SocketStatus::SendStatus::EMPTY),
-	_last_msg_time(0), _res_queue() {}
+	_recv_str(""), _last_msg_time(0), _res_queue() {}
 
 void Server::SocketStatus::init(const SOCKET& socket, const sockaddr_in& socket_info) {
 	_socket = socket;
 	_socket_info = socket_info;
-	_recv_status = SocketStatus::ReceiveStatus::RECIVE;
+	_recv_status = SocketStatus::ReceiveStatus::RECIVE_HEADERS;
 	_send_status = SocketStatus::SendStatus::IDLE;
+	_recv_str = "";
 	_last_msg_time = time(NULL);
 }
 
@@ -61,6 +62,7 @@ void Server::SocketStatus::clear() {
 	_socket_info = {};
 	_recv_status = ReceiveStatus::EMPTY;
 	_send_status = SendStatus::EMPTY;
+	_recv_str = "";
 	_last_msg_time = 0;
 	_res_queue = std::queue<HttpResponse>();
 }
@@ -126,7 +128,8 @@ int Server::create_sets(fd_set* recv_set, fd_set* send_set) {
 	FD_ZERO(recv_set);
 	FD_ZERO(send_set);
 	for (auto& sock_stat : m_sockets) {
-		if (sock_stat._recv_status == SocketStatus::ReceiveStatus::RECIVE) {
+		if (sock_stat._recv_status == SocketStatus::ReceiveStatus::RECIVE_HEADERS || 
+			sock_stat._recv_status == SocketStatus::ReceiveStatus::RECIVE_DATA) {
 			FD_SET(sock_stat._socket, recv_set);
 		}
 
@@ -176,44 +179,63 @@ bool Server::add_socket(const SOCKET& socket, const sockaddr_in& socket_info) {
 	return false;
 }
 
-void Server::receive_message(SocketStatus& sock_stat) {
+bool Server::recv_wrapper(SocketStatus& sock_stat) {
+	static const std::string HEADER_BREAK_LINE = std::string(Http::CRLF) + std::string(Http::CRLF);
 	char recv_buff[sock_stat.BUFF_SIZE];
-	int bytes_recv = recv(sock_stat._socket, recv_buff, sock_stat.BUFF_SIZE, 0);
+	int bytes_recv = recv(sock_stat._socket, recv_buff, sock_stat.BUFF_SIZE - 1, 0);
 	if (SOCKET_ERROR == bytes_recv) {
 		std::cout << "Server: Error at recv(): " << WSAGetLastError() << std::endl;
 		sock_stat.clear();
-		return;
+		return false;
 	}
 
 	if (bytes_recv == 0) {
 		std::cout << "Server: Client " << sock_stat.ip_port_string() << " requested to disconnect." << std::endl;
 		sock_stat.clear();
-		return;
-	} 
-	else {
-		if (bytes_recv >= sock_stat.BUFF_SIZE) {
-			bytes_recv = sock_stat.BUFF_SIZE - 1;
-		}
+		return false;
+	}
 
-		sock_stat._last_msg_time = time(NULL);
-		recv_buff[bytes_recv] = '\0';
-		HttpRequest req(recv_buff);
-		HttpResponse res;
+	recv_buff[bytes_recv] = '\0';
+	sock_stat._recv_str += recv_buff;
+	sock_stat._last_msg_time = time(NULL);
+	if (sock_stat._recv_status == SocketStatus::ReceiveStatus::RECIVE_HEADERS &&
+		sock_stat._recv_str.find(HEADER_BREAK_LINE) != std::string::npos) {
+		sock_stat._recv_status = SocketStatus::ReceiveStatus::RECIVE_DATA;
+	}
 
+	if (sock_stat._recv_status == SocketStatus::ReceiveStatus::RECIVE_DATA) {
+		HttpRequest req(sock_stat._recv_str.substr(0, sock_stat._recv_str.find(HEADER_BREAK_LINE) + HEADER_BREAK_LINE.length()));
 		if (req.has_header("Content-Length")) {
 			int data_length = std::stoi(req.get_header("Content-Length"));
-			
-			while (req.get_data().length() != data_length) {
-				bytes_recv = recv(sock_stat._socket, recv_buff, sock_stat.BUFF_SIZE, 0);
-				recv_buff[bytes_recv] = '\0';
-				req.set_data(req.get_data() + recv_buff);
+			int curr_data_length = sock_stat._recv_str.substr(
+				sock_stat._recv_str.find(HEADER_BREAK_LINE) + HEADER_BREAK_LINE.length(), std::string::npos
+				).length();
+			if (data_length == curr_data_length) {
+				return true;
 			}
 		}
+		else {
+			return true;
+		}
+	}
 
-		std::cout << "Server: got request from " << sock_stat.ip_port_string() << ", the request is:" << std::endl;
+	return false;
+}
+
+void Server::receive_message(SocketStatus& sock_stat) {
+	if (recv_wrapper(sock_stat)) {
+		HttpRequest req(sock_stat._recv_str);
+		HttpResponse res;
+
+		sock_stat._recv_str = "";
+		sock_stat._recv_status = SocketStatus::ReceiveStatus::RECIVE_HEADERS;
+
+		std::cout << "Server: got request from " << sock_stat.ip_port_string() << std::endl;
+
+		/*std::cout << "Server: got request from " << sock_stat.ip_port_string() << ", the request is:" << std::endl;
 		std::cout << "******************************************************************************" << std::endl;
 		std::cout << req << std::endl;
-		std::cout << "******************************************************************************" << std::endl;
+		std::cout << "******************************************************************************" << std::endl;*/
 
 		server_work(req, res);
 
@@ -281,7 +303,6 @@ void Server::server_work(HttpRequest& request, HttpResponse& response) {
 		}
 	}
 
-	//TODO add Content-length and more good headers.
 	if (request.get_method() != HttpRequest::Method::HEAD) {
 		response.add_header("Content-Length", std::to_string(response.get_data().length()));
 	}
@@ -310,11 +331,23 @@ void Server::on_head(HttpRequest& request, HttpResponse& response) {
 }
 
 void Server::on_post(HttpRequest& request, HttpResponse& response) {
+	if (!request.has_header("Content-Length")) {
+		response.set_status(HttpResponse::Status::BAD_REQUEST);
+		response.set_data("Post request must contain a 'Content-Length' header...");
+		return;
+	}
+
 	response.set_status(HttpResponse::Status::OK);
 	std::cout << "POST content: " << request.get_data() << std::endl;
 }
 
 void Server::on_put(HttpRequest& request, HttpResponse& response) {
+	if (!request.has_header("Content-Length")) {
+		response.set_status(HttpResponse::Status::BAD_REQUEST);
+		response.set_data("Post request must contain a 'Content-Length' header...");
+		return;
+	}
+
 	std::string path = create_path(request);
 	std::ofstream ofile;
 	if (Utils::is_file_exists(path)) {

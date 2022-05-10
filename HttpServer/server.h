@@ -23,7 +23,7 @@ public:
 private:
 	struct SocketStatus {
 		enum class ReceiveStatus {
-			EMPTY, IDLE, RECIVE
+			EMPTY, IDLE, RECIVE_HEADERS, RECIVE_DATA
 		};
 
 		enum class SendStatus {
@@ -37,6 +37,7 @@ private:
 		struct sockaddr_in _socket_info;
 		ReceiveStatus _recv_status;
 		SendStatus _send_status;
+		std::string _recv_str;
 		time_t _last_msg_time;
 		std::queue<HttpResponse> _res_queue;
 
@@ -57,6 +58,7 @@ private:
 	int create_sets(fd_set* recv_set, fd_set* send_set);
 	void accept_connections();
 	bool add_socket(const SOCKET& socket, const sockaddr_in& socket_info);
+	bool recv_wrapper(SocketStatus& sock_stat);
 	void receive_message(SocketStatus& sock_stat);
 	void send_message(SocketStatus& sock_stat);
 
