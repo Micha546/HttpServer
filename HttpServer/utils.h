@@ -13,5 +13,5 @@ public:
 	static bool is_number(const std::string& s);
 	static bool is_int(const std::string& s);
 	static bool is_set_empty(fd_set const* check);
-	static bool is_file_exists(std::string path);
+	static bool is_file_exists(const std::string& path);
 };

@@ -58,7 +58,7 @@ bool Utils::is_set_empty(fd_set const* check) {
 	return check == NULL || check->fd_count == 0;
 }
 
-bool Utils::is_file_exists(std::string path) {
+bool Utils::is_file_exists(const std::string& path) {
 	std::ifstream file(path);
 	bool exists = file.is_open();
 	file.close();
