@@ -55,11 +55,7 @@ bool Utils::is_int(const std::string& s) {
 }
 
 bool Utils::is_set_empty(fd_set const* check) {
-	if (check == NULL) {
-		return true;
-	}
-
-	return check->fd_count == 0;
+	return check == NULL || check->fd_count == 0;
 }
 
 bool Utils::is_file_exists(std::string path) {
