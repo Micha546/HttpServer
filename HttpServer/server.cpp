@@ -387,15 +387,9 @@ void Server::on_delete(HttpRequest& request, HttpResponse& response) {
 }
 
 void Server::on_trace(HttpRequest& request, HttpResponse& response) {
-	std::string path = create_path(request);
-	if (Utils::is_file_exists(path)) {
-		response.set_status(HttpResponse::Status::OK);
-		response.add_header("Content-Type", "message/http");
-		response.set_data(request.get_data());
-	}
-	else {
-		response.set_status(HttpResponse::Status::NOT_FOUND);
-	}
+	response.set_status(HttpResponse::Status::OK);
+	response.add_header("Content-Type", "message/http");
+	response.set_data(request.to_string());
 }
 
 void Server::on_options(HttpRequest& request, HttpResponse& response) {
