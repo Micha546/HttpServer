@@ -22,6 +22,7 @@ public:
 	void remove_header(const std::string& header_name);
 	void set_data(const std::string& data) { m_data = data; }
 	void set_version(float version) { m_version = version; }
+	void set_bad_flag(bool flag) { m_bad_http = flag; }
 	bool has_header(const std::string& header_name) const { return m_headers.find(header_name) != m_headers.end(); }
 	std::string to_string() const;
 
