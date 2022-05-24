@@ -271,6 +271,14 @@ void Server::send_message(SocketStatus& sock_stat) {
 void Server::server_work(HttpRequest& request, HttpResponse& response) {
 	response.set_version(1.1f);
 
+	if (request.has_query_param("lang")) {
+		std::string lang = request.get_query_param("lang");
+		if (lang != "he" && lang != "fr" && lang != "en") {
+			response.set_data("Server only supports lang=en/he/fr");
+			request.set_bad_flag(true);
+		}
+	}
+
 	if (request.is_bad()) {
 		response.set_status(HttpResponse::Status::BAD_REQUEST);
 	}
