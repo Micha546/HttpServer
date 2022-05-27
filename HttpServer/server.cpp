@@ -407,7 +407,7 @@ void Server::on_trace(HttpRequest& request, HttpResponse& response) {
 void Server::on_options(HttpRequest& request, HttpResponse& response) {
 	std::string path = create_path(request);
 	std::ifstream file(path);
-	if (request.get_url() != "*" && !file.is_open()) {
+	if (request.get_url() != "/*" && !file.is_open()) {
 		response.set_status(HttpResponse::Status::NOT_FOUND);
 	}
 	else {
