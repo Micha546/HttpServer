@@ -52,7 +52,7 @@ bool HttpRequest::parse_first_line(const std::string& first_line_string) {
 
 bool HttpRequest::parse_method(const std::string& method_string) {
 	m_method = E_Method(method_string);
-	return m_method.get() != Method::NONE;
+	return true;
 }
 
 bool HttpRequest::parse_url(const std::string& url_string) {
