@@ -3,6 +3,7 @@
 
 int main() {
 	constexpr int PORT = 3000;
+	constexpr bool LOG_FLAG = false;
 	WSAData wsaData;
 	if (NO_ERROR != WSAStartup(MAKEWORD(2, 2), &wsaData))
 	{
@@ -11,7 +12,7 @@ int main() {
 	}
 
 	try {
-		Server server;
+		Server server(LOG_FLAG);
 		server.listen_forever(PORT);
 	}
 	catch (std::exception& ex) {

@@ -17,8 +17,8 @@
 
 class Server {
 public:
-	Server();
-	void listen_forever(int port);		//TODO
+	Server(bool log_flag = false);
+	void listen_forever(int port);
 
 private:
 	struct SocketStatus {
@@ -51,6 +51,7 @@ private:
 
 	SOCKET m_listen_socket;
 	std::array<SocketStatus, 20> m_sockets;
+	bool log_flag;
 
 	void listen_setup(int port);
 	void handle_timeouts(double timeout_seconds = 120.0);
