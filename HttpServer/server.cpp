@@ -2,7 +2,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 
-Server::Server() : m_listen_socket(INVALID_SOCKET), m_sockets() {
+Server::Server(bool log_flag) : m_listen_socket(INVALID_SOCKET), m_sockets(), log_flag(log_flag) {
 	m_listen_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (INVALID_SOCKET == m_listen_socket)
 	{
@@ -229,13 +229,15 @@ void Server::receive_message(SocketStatus& sock_stat) {
 
 		sock_stat._recv_str = "";
 		sock_stat._recv_status = SocketStatus::ReceiveStatus::RECIVE_HEADERS;
-
-		std::cout << "Server: got request from " << sock_stat.ip_port_string() << std::endl;
-
-		/*std::cout << "Server: got request from " << sock_stat.ip_port_string() << ", the request is:" << std::endl;
-		std::cout << "******************************************************************************" << std::endl;
-		std::cout << req << std::endl;
-		std::cout << "******************************************************************************" << std::endl;*/
+		if (log_flag) {
+			std::cout << "Server: got request from " << sock_stat.ip_port_string() << ", the request is:" << std::endl;
+			std::cout << "******************************************************************************" << std::endl;
+			std::cout << req << std::endl;
+			std::cout << "******************************************************************************" << std::endl;
+		}
+		else {
+			std::cout << "Server: got request from " << sock_stat.ip_port_string() << std::endl;
+		}
 
 		server_work(req, res);
 
@@ -250,8 +252,18 @@ void Server::send_message(SocketStatus& sock_stat) {
 		return;
 	}
 	char send_buff[sock_stat.BUFF_SIZE];
+	HttpResponse res = sock_stat._res_queue.front();
+	if (log_flag) {
+		std::cout << "Server: sending response to " << sock_stat.ip_port_string() << ", the response is:" << std::endl;
+		std::cout << "******************************************************************************" << std::endl;
+		std::cout << res << std::endl;
+		std::cout << "******************************************************************************" << std::endl;
+	}
+	else {
+		std::cout << "Server: sending response to " << sock_stat.ip_port_string() << std::endl;
+	}
 
-	std::string res_str = sock_stat._res_queue.front().to_string();
+	std::string res_str = res.to_string();
 	sock_stat._res_queue.pop();
 	memcpy(send_buff, res_str.c_str(), res_str.length() * sizeof(char));
 
@@ -270,14 +282,6 @@ void Server::send_message(SocketStatus& sock_stat) {
 
 void Server::server_work(HttpRequest& request, HttpResponse& response) {
 	response.set_version(1.1f);
-
-	if (request.has_query_param("lang")) {
-		std::string lang = request.get_query_param("lang");
-		if (lang != "he" && lang != "fr" && lang != "en") {
-			response.set_data("Server only supports lang=en/he/fr");
-			request.set_bad_flag(true);
-		}
-	}
 
 	if (request.is_bad()) {
 		response.set_status(HttpResponse::Status::BAD_REQUEST);
@@ -368,7 +372,7 @@ void Server::on_put(HttpRequest& request, HttpResponse& response) {
 	ofile.open(path);
 	if (!ofile.is_open()) {	//means that the url contains folders or is bad url...
 		response.set_status(HttpResponse::Status::BAD_REQUEST);
-		response.set_data("The url provided is either a bad url or contains folders...");
+		response.set_data("The url provided is either a bad url, contains folders or the lang query param is not supported, supported lang are: he/en/fr...");
 		ofile.close();
 		return;
 	}
